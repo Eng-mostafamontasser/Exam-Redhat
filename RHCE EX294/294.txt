@@ -1,0 +1,218 @@
+ Install and configure Ansible
+
+Install and configure Ansible on the control node control.lab1.example.com as follows:
+	Install the required packages
+	Create a static inventory file called /home/matthew/ansible/inventory so that:
+	node1 is a member of the dev host group
+	node2 is a member of the test host group
+	node3 and node4 are members of the prod host group
+	node5 is a member of the balancers host group
+	The prod group is a member of the webservers host group
+	Create a configuration file called /home/matthew/ansible/ansible.cfg so that:
+	The host inventory file is /home/matthew/ansible/inventory
+	The location of roles used in playbooks includes /home/matthew/ansible/roles
+==============================
+ Create and run Ansible ad-hoc commands
+
+As a system administrator, you will need to install software on the managed nodes.
+
+Create a shell script called /home/matthew/ansible/adhoc.sh that uses Ansible ad-hoc commands to create a yum repository on each of the managed nodes as follows:
+
+Repository 1:
+	The name of the repository is EX294_BASE
+	The description is EX294 base software
+	The base URL is http://rhgls.lab1.example.com/BaseOS
+	GPG signature checking is enabled
+	The GPG key URL is http://rhgls.lab1.example.com/RHEL/RPM-GPG-KEY-redhat-release
+	The repository is enabled
+
+Repository 2:
+	The name of the repository is EX294_STREAM
+	The description is EX294 stream software
+	The base URL is http://rhgls.lab1.example.com/AppStream
+	GPG signature checking is enabled
+	The GPG key URL is http://rhgls.lab1.example.com/RHEL/RPM-GPG-KEY-redhat-release
+	The repository is enabled 
+==========================
+ Install packages
+
+Create a playbook called /home/matthew/ansible/packages.yml that:
+	Installs the php and mariadb packages on hosts in the dev, test, and prod host groups
+	Installs the RPM Development Tools package group on hosts in the dev host group
+	Updates all packages to the latest version on hosts in the dev host group 
+=================================
+ Use a RHEL system role
+
+Install the RHEL system roles package and create a playbook called /home/matthew/ansible/selinux.yml that:
+	Runs on all managed nodes
+	Uses the selinux role
+	Configures the role to use selinux in enforcing state 
+=================================
+ Install roles using Ansible Galaxy
+
+Use Ansible Galaxy with a requirements file called /home/matthew/ansible/roles/requirements.yml to download and install roles to /home/matthew/ansible/roles from the following URLs:
+	http://rhgls.lab1.example.com/materials/haproxy.tar
+
+The name of this role should be balancer
+	http://rhgls.lab1.example.com/materials/phpinfo.tar
+
+The name of this role should be phpinfo
+====================================
+ Create and use a role
+
+Create a role called apache in /home/matthew/ansible/roles with the following requirements:
+	The httpd package is installed, enabled on boot, and started
+	The firewall is enabled and running with a rule to allow access to the web server
+	A template file index.html.j2 exists and is used to create the file /var/www/html/index.html with the following output:
+
+Welcome to HOSTNAME on IPADDRESS
+
+where HOSTNAME is the fully qualified domain name of the managed node and IPADDRESS is the IP address of the managed node.
+
+Create a playbook called /home/matthew/ansible/newrole.yml that uses this role as follows:
+	The playbook runs on hosts in the webservers host group
+
+
+======================================
+ Use roles from Ansible Galaxy
+
+Create a playbook called /home/matthew/ansible/roles.yml with the following requirements:
+	The playbook contains a play that runs on hosts in the balancers host group and uses the balancer role
+	This role configures a service to load balance web server requests between hosts in the webservers host group
+	Browsing to hosts in the balancers host group (for example http://node5.lab1.example.com/) produces the following output:
+
+Welcome to node3.lab1.example.com on 172.24.1.8
+	Reloading the browser produces output from the alternate web server:
+
+Welcome to node4.lab1.example.com on 172.24.1.9
+	The playbook contains a play that runs on hosts in the webservers host group and uses the phpinfo role
+	Browsing to hosts in the webservers host group with the URL /hello.php produces the following output:
+
+Hello PHP World from FQDN
+
+where FQDN is the fully qualified domain name of the host
+
+	For example, browsing to http://node3.lab1.example.com/hello.php, produces the following output:
+
+Hello PHP World from node3.lab1.example.com
+
+along with various details of the PHP configuration including the version of PHP that is installed.
+	Similarly, browsing to http://node4.lab1.example.com/hello.php, produces the following output:
+
+Hello PHP World from node4.lab1.example.com
+
+along with various details of the PHP configuration including the version of PHP that is installed 
+============================
+ Create and use a partition
+
+Create a playbook called /home/matthew/ansible/partition.yml with the following requirements:
+	The playbook contains a play that runs on hosts in the balancers host group
+	Creates a single primary partition number 1 of size 1500 MiB on device vdb
+	Formats the partition with the ext4 filesystem
+	Mounts the filesystem persistently at /newpart
+	Creates a single primary partition number 1 of size 1500 MiB on device vdd
+	Formats the partition with the ext4 filesystem
+	Mounts the filesystem persistently at /newpart1
+	If the requested partition size cannot be created, the error message
+
+Could not create partition of that size
+should be displayed and the size 800 MiB should be used instead
+	If the device vdd does not exist, the error message
+
+Disk does not exist
+should be displayed 
+==================================
+ Generate a hosts file
+
+	Download an initial template file from http://rhgls.lab1.example.com/materials/hosts.j2 to /home/matthew/ansible
+	Complete the template so that it can be used to generate a file with a line for each inventory host in the same format as /etc/hosts
+	Create a playbook called /home/matthew/ansible/hosts.yml that uses this template to generate the file /etc/myhosts on hosts in the dev host group.
+When the playbook is run, the file /etc/myhosts on hosts in the dev host group should have a line for each managed host:
+
+127.0.0.1 localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1 localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+172.24.1.6 node1.lab1.example.com node1
+172.24.1.7 node2.lab1.example.com node2
+172.24.1.8 node3.lab1.example.com node3
+172.24.1.9 node4.lab1.example.com node4
+172.24.1.10 node5.lab1.example.com node5
+
+NOTE: The order in which the inventory host names appear is not important. 
+=======================================
+ Modify file content
+
+Create a playbook called /home/matthew/ansible/issue.yml as follows:
+	The playbook runs on all inventory hosts
+	The playbook replaces the contents of /etc/issue with a single line of text as follows:
+	On hosts in the dev host group, the line reads: Development
+	On hosts in the test host group, the line reads: Test
+	On hosts in the prod host group, the line reads: Production
+==============================
+ Create a web content directory
+
+Create a playbook called /home/matthew/ansible/webcontent.yml as follows:
+	The playbook runs on managed nodes in the dev host group
+	Create the directory /webdev with the following requirements:
+	it is owned by the webdev group
+	it has regular permissions: owner=read+write+execute, group=read+write+execute, other=read+execute
+	it has special permissions: set group ID
+	Symbolically link /var/www/html/webdev to /webdev
+	Create the file /webdev/index.html with a single line of text that reads: Development
+	Browsing this directory on hosts in the dev host group (for example http://node1.lab1.example.com/webdev/) produces the following output:
+
+Development 
+==================================
+	Generate a hardware report
+
+Create a playbook called /home/matthew/ansible/hwreport.yml that produces an output file called /root/hwreport.txt on all managed nodes with the following information:
+	Inventory host name
+	Total memory in MB
+	BIOS version
+	Size of disk device vda
+	Size of disk device vdb
+	Each line of the output file contains a single key=value pair.
+Your playbook should:
+	Download the file from http://rhgls.lab1.example.com/materials/hwreport.empty and save it as /root/hwreport.txt
+	Modify /root/hwreport.txt with the correct values
+	If a hardware item does not exist, the associated value should be set to NONE
+===================================
+	Create a password vault
+
+Create an Ansible vault to store user passwords as follows:
+	The name of the vault is /home/matthew/ansible/locker.yml
+	The vault contains two variables with names:
+	pw_developer with value Imadev
+	pw_manager with value Imamgr
+	The password to encrypt and decrypt the vault is whenyouwishuponastar
+	The password is stored in the file /home/matthew/ansible/secret.txt
+==================================
+	Create user accounts
+
+	Download a list of users to be created from http://rhgls.lab1.example.com/materials/user_list1.yml and save it to /home/matthew/ansible
+	Using the password vault /home/matthew/ansible/locker.yml created elsewhere in this exam, create a playbook called /home/matthew/ansible/users.yml that creates user accounts as follows:
+	Users with a job description of developer should be:
+	created on managed nodes in the dev and test host groups
+	assigned the password from the pw_developer variable
+	assigned the corresponding user id
+	a member of supplementary group devops
+	Users with a job description of manager should be:
+	created on managed nodes in the prod host group
+	assigned the password from the pw_manager variable
+	assigned the coresponding user id
+	a member of supplementary group opsmgr
+	Passwords should use the SHA512 hash format.
+	Your playbook should work using the vault password file /home/matthew/ansible/secret.txt created elsewhere in this exam. 
+==========================================
+ Rekey an Ansible vault
+
+Rekey an existing Ansible vault as follows:
+	Download the Ansible vault from http://rhgls.lab1.example.com/materials/salaries.yml to /home/matthew/ansible
+	The current vault password is insecure4sure
+	The new vault password is bbe2de98389b
+	The vault remains in an encrypted state with the new password 
+===================================
+	Configure a cron job
+
+Create a playbook called /home/matthew/ansible/cron.yml that runs on all managed hosts and creates a cron job for user natasha as follows:
+	The user natasha must configure a cron job that runs every 2 minutes and executes logger "EX294 in progress" 

@@ -1,0 +1,52 @@
+you run playbooks using this command
+
+ansible-navigator run -m stdout PLAYBOOK
+
+Its suggested to alias this command to something shorter for time saving.
+
+steps:
+
+vi .bash_profile
+
+alias ansnav='ansible-navigator run -m stdout'
+
+source .bash_profile
+
+then install and start ansible packages,
+
+- yum install ansible-navigator
+- yum install ansible-core
+- podman login REGISTRY-LINK #To pull ansible-navigator image
+- ansible-navigator #To start the container
+
+Go to .ansible-navgiator.yml 
+- add this lines at the end:
+
+playbook-artifact:
+    enable: false 
+
+
+
+**collections in ansible.cfg:
+
+collections_path=.....
+
+To install collections for example, from the registry: http://rhgls.area2.example.com/
+
+collections are:
+
+- example.communitygeneral.tar.gz
+- posix.example.tar.gz
+- redhat.example.tar.gz
+
+You will do
+
+mkdir mycollections
+vi collections-requirements.yml
+
+collections:
+ - name: http://rhgls.area2.example.com/example.communitygeneral.tar.gz
+ - name: http://rhgls.area2.example.com/posix.example.tar.gz
+ - name: http://rhgls.area2.example.com/redhat.example.tar.gz
+
+ansible-galaxy collection install -r collections-requirements.yml -p /mycollections

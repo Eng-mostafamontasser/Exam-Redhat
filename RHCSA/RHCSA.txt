@@ -1,0 +1,632 @@
+﻿servera:
+******** 
+Don’t run ssh to servera, it has network issue. first use view vm and fix network issue, then run ssh from physical host to servera.
+==================================================================================================================================
+findmnt --verify	>>to check for mount
+----------------------------------------
+1-To change the target:
+#systemctl get-default
+	multi-user.target
+#systemctl set-default graphical.target
+#systemctl isolate graphical.target
+>>in emergency mode
+1-systemd.unit=emergency.target
+2-mount -o remount,rw /
+3-vim /etc/fstab
+---------------------------------------------------------------
+2-To change SELinux:
+#getenforce
+	Enforcing(1) or Permissive(0)
+#setenforce Enforcing
+or:
+#vim /etc/selinux/config
+SELINUX=enforcing
+#reboot
+----------------------------------------------------------------
+3-To enable IP forwarding on the machine:
+#vim /etc/sysctl.conf
+net.ipv4.ip_forward=1
+:wq
+#sysctl -p			>>p option to read values from the file
+----------------------------------------------------------------
+Note:
+xfs filesystem can't be shrinked
+ext4 filesystem can be shrinked
+>>to extend ext4 there is no need to unmount but incase of reduce (lvreduce) we must unmount first
+#e2fsck /dev/vgname/lvname			>>to check that there is no problem in the filesystem 
+#ummount /dev/vgname/lvname
+#lvreduce -r -L newsize /dev/vgname/lvname		or		lvreduce --resizefs
+================================================================================================================================
+Question 1:
+***********
+Configure network and set the static hostname.
+hostname 	=servera.lab.example.com
+ip-address 	=172.25.250.10
+subnetmask 	=255.255.255.0
+gateway 	=172.25.250.254
+dns 		=172.25.254.254
+dns-search 	=lab.example.com
+NOTE: on servera nmcli connection is available but without parameters like ip/mask, dns, gw, dns-search
+
+Solution:
+^^^^^^^^^
+#hostname
+#hostnamectl set-hostname servera.lab.example.com
+#hostname
+#ifconfig
+#nmcli connection show
+#ip route
+#sudo grep "BOOTPROTO" /etc/sysconfig/network-scripts/ifcfg-Wired_connection_1
+#cat /etc/resolv.conf
+#nmcli connection modify "Wired connection 1" ipv4.address 172.25.250.10/24 ipv4.gateway 172.25.250.254 ipv4.dns 172.25.254.254 ipv4.dns-search lab.example.com ipv4.method manual
+#nmcli connection down "Wired connection 1"
+#nmcli connection up "Wired connection 1"
+#nmcli connection reload
+#ifconfig
+#nmcli connection show
+#cat /etc/resolv.conf
+================================================================================================================================
+Qyestion 2:
+***********
+Configure YUM repository with the 2given links (BaseOs and AppStream)
+BaseOs: 	http://content.example.com/rhel8.0/x86_64/dvd/BaseOS
+AppStream: 	http://content.example.com/rhel8.0/x86_64/dvd/AppStream
+
+Solution:
+^^^^^^^^^
+#yum repolist
+	No repositories available
+#vim /etc/yum.repos.d/rhel.repo
+[BaseOs]
+name=BaseOs
+baseurl=http://content.example.com/rhel8.0/x86_64/dvd/BaseOS
+gpgcheck=0
+enabled=1
+[AppStream]
+name=AppStream
+baseurl=http://content.example.com/rhel8.0/x86_64/dvd/AppStream
+gpgcheck=0
+enabled=1
+:wq
+-------
+Verify:
+-------
+#yum repolist
+================================================================================================================================
+Question 3:
+***********
+Debug SELinux:
+Web server running on non-standard port “82” is having issues serving content. Debug and fix the issues.
+-The web server can server all the existing HTML files from '/var/www/html', Don't make any changes to these files.
+-Web service should automatically start at boot time.
+
+Solution:
+^^^^^^^^^
+#getenforce
+	Enforcing
+#yum list httpd
+#systemctl is-enabled httpd
+#systemctl enable --now httpd
+#systemctl status httpd
+#firewall-cmd --list-all		firewall-cmd --add-port=82/tcp --permanent		>>In case port 82 not found 
+	ports: 82/tcp
+#vim /etc/httpd/conf/httpd.conf
+go to line number45
+#Listen 80
+Listen 82
+:wq
+#semanage port -l | grep "http"
+	http_port_t tcp 80, 81, 443, 488, 8008, 8009, 8443, 9000
+#semange port -a -t httpd_port_t -p tcp 82
+#semanage port -l | grep "http"
+	http_port_t tcp 82, 80, 81, 443, 488, 8008, 8009, 8443, 9000
+#systemctl restart httpd.service
+-------
+Verify:
+-------
+#echo "This is my web server" > /var/www/html/file.html
+#curl http://servera.lab.example.com:82/file.html
+	This is my web server
+================================================================================================================================
+Question 4:
+***********
+Create User accounts with supplementary group.
+-group:
+	sysadms
+-users:
+	natasha
+	harry
+	sarah (with nologin shell)
+-natasha and harry should be the member of sysadms group.
+-password for all users should be "trootent"
+
+Solution:
+^^^^^^^^^
+#grep "sysadmin" /etc/group
+#groupadd sysadmin
+#id harry
+#id natasha
+#id sarah
+#useradd -G sysadmin natasha
+#passwd natasha
+#useradd -G sysadmin harry
+#passwd harry
+or 
+# echo "trootent" | passwd --stdin harry
+# echo "trootent" | passwd --stdin natasha 
+# echo "trootent" | passwd --stdin sarah
+#grep "sysadmin" /etc/group
+	sysadmin:x:1001:natasha,harry
+#useradd -s /sbin/nologin sarah
+#passwd sarah
+#groupmems -lg sysadmin
+	natasha harry
+================================================================================================================================
+Question 5:
+***********
+Cron Job
+-Configure a cron job that runs every 1 minutes and executes: logger "EX200 in progress" as the user natasha.
+-Configure a cron job for user "natasha", cron must runs daily at 2:23pm and inside executes the /usr/bin/echo "welcome".
+
+Solution:
+^^^^^^^^^
+#systemctl status crond.service
+#systemctl restart crond.services
+#crontab -eu natasha
+*/1 * * * * logger "EX200 in progress"
+23 14 * * * /usr/bin/echo "welcome"
+:wq!
+#crontab -lu natasha
+-------
+Verify:
+-------
+#tail -f /var/log/messages | grep EX200
+	Nov 5 14:42:01 servera natasha[2219]: EX200 in progress
+================================================================================================================================
+Question 6:
+***********
+Create a collaborative DIR. (change group owner, set the permissions along with sgid)
+-Create the Directory "/home/sysadms" with the following characteristics.
+-Group ownership of "/home/sysadms" should go to "sysadms" group.
+-The directory should have full permission for all members of "sysadms" group but not to the other users except "root".
+-Files created in future under "/home/sysadms" should get the same group ownership.
+
+Solution:
+^^^^^^^^^
+#mkdir /home/sysadms
+#ls -ld /home/sysadms
+#grep "sysadms" /etc/group
+#groupadd sysadms
+#chgrp sysadms /home/sysadms
+#chmod 2770 /home/sysadms
+#touch /home/sysadms/file1.txt
+#ls -l /home/sysadms/file1.txt
+================================================================================================================================
+Question 7:
+***********
+Configure NTP
+chrony server is "classroom.example.com"
+
+Solution:
+^^^^^^^^^
+#systemctl status chronyd.service
+#systemctl restart chronyd.service
+#timedatectl set-ntp true
+#timedatectl
+#vim /etc/chrony.conf
+**hash line number 3 till 6 and write your question’s ntp server name**
+#server 0.rhel.pool.ntp.org iburst
+#server 1.rhel.pool.ntp.org iburst
+#server 2.rhel.pool.ntp.org iburst
+#server 3.rhel.pool.ntp.org iburst
+server classroom.example.com iburst
+:wq!
+#systemctl restart chronyd.service
+#timedatectl
+#chronyc sources -v
+================================================================================================================================
+Question 8:
+***********
+Configure AutoFS (NFS vers=4.0, so explicitly don't need to mention in auto.map file) 
+-NfS vers=4.0 exports the /home/guests to your system where "X" is your station number. 
+-ldapuser's home directory is classroom.example.com:/home/guests/ldapuserX 
+-ldapuser's home directory should be automounted locally beneath at /home/guests/ldapuserx
+-while login with any of the ldapuser then only home directory should accessible from your system that ldapuserX
+
+Solution:
+^^^^^^^^^
+#yum install autofs.x86_64 -y
+#systemctl enable autofs.service
+#systemctl start autofs.service
+#showmount -e <IP-Address of server>
+#vim /etc/auto.master.d/exam.autofs
+/- /etc/mydirectmaps
+:wq!
+#mkdir -p /rhome/remoteusr2
+#vim /etc/mydirectmaps
+/rhome/remoteusr2 -rw,sync IP-Address of server:/rhome/remoteusr2
+:wq!
+
+OR
+#vim /etc/auto.master.d/exam.autofs
+/home/ldap              /etc/auto.ldap
+#vim /etc/auto.ldap
+ldapuser1	-rw,sync	server's ip:/home/ldap
+
+#systemctl restart autofs
+-------
+Verify:
+-------
+#ls -l /rhome/remoteusr2
+#su – remoteusr2
+#cd /rhome/remoteusr2
+================================================================================================================================
+Question 9:
+***********
+copy ‘/etc/fstab’ file to ‘/var/tmp/’ then configure ‘/var/tmp/fstab’ file permissions with ACL
+-The file /var/tmp/fstab should owned by the "root".
+-The file /var/tmp/fstab should belongs to the group "root".
+-The file /var/tmp/fstab should not be executable by any one.
+-The user "sarah" should able to read and write to the file.
+-The user "harry" can neither read nor write to the file.
+-Other users (future and current) should be able to read /var/tmp/fstab.
+
+Solution:
+^^^^^^^^^
+#cp /etc/fastab /var/tmp/fstab
+#ls -l /var/tmp/fstab
+#setfacl -m u:sarah:rw,u:harry:- /var/tmp/fstab
+#getfacl /var/tmp/fstab
+================================================================================================================================
+Question 10:
+************
+Create user 'bob' with 2112 uid and set the password 'trootent'
+
+Solution:
+^^^^^^^^^
+#id bob
+#useradd -u 2112 bob
+#passwd bob
+#id bob
+	uid=2112(bob) gid=2112(bob) groups=2112(bob)
+================================================================================================================================
+Question 11:
+************
+Locate all files owned by user 'harry' and copy it under '/root/harry-files'
+
+Solution:
+^^^^^^^^^
+#id harry
+	uid=1002(harry) gid=1003(harry) groups=1003(harry),1001(sysadmin)
+#mkdir /root/harry-files
+#find / -user harry -exec cp -rvfp {} /root/harry-files \;
+#ll -a /root/harry-files
+================================================================================================================================
+Question 12:
+************
+Find a string 'ich' from '/usr/lib/mem/ex200/samplefile.txt' and put it into '/root/lines' file.
+
+Solution:
+^^^^^^^^^
+#grep "ich" /usr/lib/mem/ex200/samplefile.txt > /root/lines
+#cat /root/lines
+================================================================================================================================
+Question 13:
+************
+create an archive '/root/backup.tar.bz2' of '/usr/local' dir and compress it with bzip2.
+
+Solution:
+^^^^^^^^^
+#tar cfvj /root/backup.tar.bz2 /usr/local
+#ll /root
+#tar tfvj backup.tar.bz2
+================================================================================================================================
+serverb:
+********
+Important Instructions, read carefully.
+In serverb 3disks will be available.
+-/dev/vda: for ROOT filesystem (don't do anything under this Disk)
+-/dev/vdb: You need to use for Swap and LVM Partition.
+-/dev/vdc: Will be used for Stratis/VDO.
+================================================================================================================================
+Question 14:
+************
+Reset root user password and make it 'trootent'
+
+Solution:
+^^^^^^^^^
+1-Boot your machine
+2-interrupt your kernel from boot menu, by choose your entry and press e
+3-Move to line start with linux (kernel) and press End key
+4-Append rd.break
+	Note: No SELinux is not running in rd.break
+5-press CTRL-x to boot with the changes.
+	At this stage(emergency mode), the system presents a root shell, with the actual root file system on the disk
+	mounted read-only on /sysroot
+6-Remount root as RW
+	#mount -o rw,remount /sysroot
+7-Pivot your root to /sysroot ,where /sysroot is treated as the root of the file-system tree.
+	#chroot /sysroot/
+	Because cmd passwd update passwords in /etc/shadow
+8-Change your password
+	#passwd root
+		New /etc/shadow will has NO label
+9-To make sure that all unlabeled files, including /etc/shadow at this point, get relabeled during boot. We have to relabel 
+  the file system again
+	#touch /.autorelabel
+10-CTRL-D twice
+	Type exit twice. The first command exits the chroot jail, and the second command exits the initramfs 
+	debug shell.
+	Once restarting, the selinux will detect the file /.autorelabel
+11-Note: Any file's contect changed with chcon, will return to selinux default label
+================================================================================================================================
+Question 15:
+************
+Configure YUM Repos (BaseOs and AppStream)
+BaseOs: 	http://content.example.com/rhel8.0/x86_64/dvd/BaseOS
+AppStream: 	http://content.example.com/rhel8.0/x86_64/dvd/AppStream
+
+Solution:
+^^^^^^^^^
+#yum repolist
+#vim /etc/yum.repos.d/rhel.repo
+[BaseOs]
+name=BaseOs
+baseurl=http://content.example.com/rhel8.0/x86_64/dvd/BaseOS/
+gpgcheck=0
+enabled=1
+[AppStream]
+name=AppStream
+baseurl=http://content.example.com/rhel8.0/x86_64/dvd/AppStream/
+gpgcheck=0
+enabled=1
+:wq
+-------
+Verify:
+-------
+#yum repolist
+================================================================================================================================
+Question 16:
+************
+Resize the logical volume "mylv". after reboot size should be in between 200MB to 300MB
+
+Solution:
+^^^^^^^^^
+#pvs	or	pvdisplay
+#vgs	or	vgdisplay
+#lvs	or	lvdisplay
+#df -h
+#lvextend -r -L 250M /dev/myvg/mylv
+#lvs	or	lvdisplay
+#df -h
+================================================================================================================================
+Question 17:
+************
+Add a swap partition of 512MB and mount it permanently.
+
+Solution:
+^^^^^^^^^
+#free -m
+#swapon -s
+#fdisk /dev/vdb
+p
+n
+e
+enter
+enter
+enter
+p
+n
+enter
++512M
+p
+t
+select new partition number (5)
+82
+p
+w
+#partprobe
+#mkswap /dev/vdb5
+#blkid
+#vim /etc/fstab
+#UUID=e5a95dd4-0417-4229-a499-92b29fe9f201 swap swap defaults 0 0
+#mount -a
+#swapon /dev/vdb5		or		swapon -a
+#free -m
+#swapon -s
+================================================================================================================================
+Question 18:
+************
+Create a logical Volume and mount it permanently.
+- Create the logical volume with the name "wshare" by using 50PE's from the volume group "wgroup".
+- Consider each PE size of volume group as "8MB".
+- Mount it on '/mnt/wshare' with file system vfat.
+
+Solution:
+^^^^^^^^^
+#fdisk /dev/vdb
+p
+n
+l
+enter
+enter
++1024M
+p
+t
+select new partition number (6)
+8e
+p
+w
+#partprobe
+#pvcreate /dev/vdb6
+#vgcreate -s 8M wgroup /dev/vdb6		>>Means that each PE size in the VG is 8M
+#vgdisplay
+#lvcreate -l 50 -n wshare wgroup		>>Means create LV of 50 PE which means that the space is 50PE*8M=400M
+#lvs	or	lvdisplay
+#mkfs -t vfat /dev/mapper/wgroup-wshare
+#mkdir /mnt/wshare
+#blkid
+#vim /etc/fstab
+UUID=1902-BFCE /mnt/wshare vfat defaults 0 0
+#mount -a
+#df -h
+================================================================================================================================
+Question 19:
+************
+Create a new STRATIS volume according to following requirements:
+STRATIS:
+-Use the un-partitioned disk
+-The volume is named 'stratisfs' belongs to 'stratispool'
+-The volume must be mounted permanent under '/stratisvolume'
+-Place a copy of the file "http://content.example.com/file.txt" under '/stratisvolume'
+-Take a snapshot of 'stratisfs' named 'stratissnap'.
+VDO:
+-Create the VDO volume labvdo, with the device /dev/vdd.
+-Set its logical size to 50GB.
+-Mount the volume labvdo on /labvdovol with the XFS file system so that it persists across reboots.
+-Create three copies of the file named /root/install.img on the volume labvdo.
+-Compare the statistics of the volume to verify the data deduplication and compression happening on the volume
+
+Solution: (Stratis)
+^^^^^^^^^
+#yum list stratis*
+#yum install stratis-cli.noarch stratisd.x86_64 -y
+#systemctl enable --now stratisd.service
+#systemctl start stratisd.service
+#stratis pool create stratispool /dev/vdc
+#stratis pool list
+#stratis blockdev list
+#stratis filesystem create stratispool stratisfs
+#stratis filesystem list
+#mkdir /stratisvolume
+#blkid
+#vim /etc/fstab
+UUID=9825...d6ca /stratisvolume xfs defaults,x-systemd.requires=stratisd.service 0 0
+#mount -a
+#df -h
+#cd /stratisvolume/
+#wget http://content.example.com/file.txt
+#stratis filesystem snapshot stratispool stratisfs stratissnap
+#stratis filesystem list
+--------------------------------------------------------------------------------------------------------------------------------
+Solution: (VDO)
+^^^^^^^^^
+#yum list vdo*
+#yum list kmod*
+#yum install vdo.x86_64 kmod* -y
+#vdo create --name=labvdo --device=/dev/vdd --vdoLogicalSize=50G
+	Creating VDO labvdo
+	Starting VDO labvdo
+	Starting compression on VDO labvdo
+	VDO instance 0 volume is ready at /dev/mapper/labvdo
+#vdo list
+#vdostats labvdo
+#vdo status --name=labvdo
+#vdo status --name=labvdo | grep "Compression"
+	Compression: enabled
+#vdo status --name=labvdo | grep "Deduplication"
+	Deduplication: enabled
+#mkfs.xfs -K /dev/mapper/labvdo
+#udevadm settle
+#mkdir /labvdovol
+#blkid
+#vim /etc/fstab
+UUID=420d2f4f-144d-49bb-a1b5-ead77623dc3f /labvdovol xfs defaults,x-systemd.requires=vdo.service 0 0
+:wq!
+#mount -a
+#vdostats --human-readable
+#cp /root/install.img /labvdovol/install.img
+#vdostats --human-readable
+#cp /root/install.img /labvdovol/install.img1
+#vdostats --human-readable
+#cp /root/install.img /labvdovol/install.img2
+#vdostats --human-readable
+================================================================================================================================
+Question 20:
+************
+Configure System Tuning:
+-Choose the recommended 'tuned' profile for your system and set it as the default.
+
+Solution:
+^^^^^^^^^
+#yum list tuned*
+#yum install tuned.noarch
+#syatemctl enable --now tuned.service
+#syatemctl start tuned.service
+#tuned-adm list
+#tuned-adm active
+	Current active profile: balanced
+#tuned-adm recommend
+	virtual-guest
+#tuned-adm profile virtual-guest
+#tuned-adm active
+	Current active profile: virtual-guest
+================================================================================================================================
+Question 21:
+************
+Create a container with the name, “logserver” from rhel8/rsyslog image from registry.lab.example.com registry.
+-configure the container with systemd services as the wallah user using the service name, “container-logserver” so that 
+ it can be persistent across reboot.
+-Configure your host journal to store all journal across reboot.
+-copy all journal form /var/log/journal and all subdirectories to /home/wallah/container-logserver.
+-create and mount /home/wallah/container-logserver as a persistent storage to the container as /var/log/journal when 
+ container start.
+-Use “administrator” as the username and “admin123” as the credentials for the image registry.
+-use wallah as wallah’s password. No root password is needed because wallah is a sudo user.
+
+https://tekneed.com/rhcsa-8-exam-practice-question-20-configure-containers/
+
+Solution:
+^^^^^^^^^
+Must login with wallah user 
+#yum module install container-tools -y
+#podman login registry.redhat.io
+		Username: administrator
+		Password: admin123
+		Login Succeeded!
+#podman search rsyslog
+#podman pull registry.redhat.io/rhel8/rsyslog
+#mkdir /home/wallah/container-logserver
+-----------------------------------------------------------------------------------------------------------------------------
+ROOT
+#mkdir /var/log/journal																				>>root
+#systemctl restart systemd-journald																	>>root
+#ls -l /var/log/journal/																			>>root
+	total 0
+	drwxr-xr-x. 2 root root 28 Jan  4 16:56 929cad58bb4d45c089ceda07bd366c3f
+#ls -l /var/log/journal/929cad58bb4d45c089ceda07bd366c3f/			>>.journal extention files		>>root
+#cp -av /var/log/journal/929cad58bb4d45c089ceda07bd366c3f/* /home/wallah/container-logserver		>>root
+#ls -l /home/wallah/container-logserver/															>>root
+#chown -R wallah:wallah /home/wallah/container-logserver/											>>root
+------------------------------------------------------------------------------------------------------------------------------
+WALLAH
+#podman run -d --name logserver -v /home/wallah/container-logserver/:/var/log/journal:Z registry.redhat.io/rhel8/rsyslog:latest
+#podman ps			>>verify that the container is running
+#mkdir -p /home/wallah/.config/systemd/user
+#cd /home/wallah/.config/systemd/user/
+#podman generate systemd --name logserver --files --new
+	/home/wallah/.config/systemd/user/container-logserver.service
+#ls				>>to verify
+	container-logserver.service
+#loginctl enable-linger wallah
+#loginctl show-user wallah |grep -i linger				
+	Linger=yes
+#podman exec -it logserver /bin/bash
+#journalctl -xe
+#exit
+??? #podman container rm logserver -f			>>f: to stop the container before removing it
+#systemctl --user daemon-reload				
+#systemctl --user enable --now container-logserver
+#podman ps									
+	CONTAINER ID  IMAGE                                    COMMAND          CREATED             STATUS                 PORTS   NAMES
+	ba1a08cd4e59  registry.redhat.io/rhel8/rsyslog:latest  /bin/rsyslog.sh  About a minute ago  Up About a minute ago
+	01833e16-3a85-47b6-b3cc-e04dc2edd109
+#systemctl --user status container-logserver
+#systemctl --user stop container-logserver
+#reboot
+#podman ps
+#systemctl --user status container-logserver
+
+
+logout from the session and re-ssh with the user itself don't do (su or su -)
+

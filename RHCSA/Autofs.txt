@@ -1,0 +1,48 @@
+$vim /etc/auto.master.d/exam.autofs
+/-	/etc/mydirectmaps
+$mkdir -p /netdir/remoteuser7
+$sudo vim /etc/mydirectmaps
+/netdir/remoteuser7 -rw,sync Server_IP:/netdir/remoteusr7
+$systemctl restart autofs
+[root@localhost ~]# ls -l /netdir/remoteuser7
+[root@localhost ~]# su - remoteuser7
+[remoteuser7@localhost ~]$ cd /netdir
+[remoteuser7@localhost netdir]$ cd /netdir/remoteuser7
+[remoteuser7@localhost ~]$ exit
+
+
+______________________________________________________________
+WORKED FOR ME SOLUTION
+ON SERVER 
+# mkdir /home/remoteuser
+# chmod 777 /home/remoteuser
+# touch /home/remoteuser/serverfile
+
+ON CLIENT
+# useradd remoteuser
+# rm -rf /home/remoteuser/
+# passwd remoteuser 
+passwd: all authentication tokens updated successfully.
+# su - remoteuser 
+su: warning: cannot change directory to /home/remoteuser: No such file or directory
+
+#getent passwd ldapuser
+remoteuser:x:1004:1005::/home/remoteuser:/bin/bash
+
+#yum install autofs.x86_64 -y
+#systemctl enable autofs.service
+#systemctl start autofs.service
+#showmount -e <IP-Address of server>
+#vim /etc/auto.master
+/home/remoteuser        /etc/auto.misc
+
+:wq!
+
+#vim /etc/auto.misc
+remoteuser      -rw,sync,fstype=nfs4    172.25.250.5:/home/remoteuser
+
+:wq!
+
+# su - remoteuser 
+[remoteuser@localhost ~]$ pwd
+/home/remoteuser

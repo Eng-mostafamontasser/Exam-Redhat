@@ -1,0 +1,297 @@
+Servera 
+Question1 : Configure Network
+
+# nmcli connection modify ens160 ipv4.addresses 172.25.250.10/24
+# nmcli connection modify ens160 ipv4.dns 172.25.250.254
+# nmcli connection modify ens160 ipv4.gateway 172.25.250.254
+# nmcli connection modify ens160 ipv4.dns-search lab.example.com
+# hostnamectl set-hostname servera.lab.example.com
+# nmcli connection modify ens160 ipv4.method manual 
+# nmcli connection down ens160 
+Connection 'ens160' successfully deactivated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/1)
+# nmcli connection up ens160 
+#ifconfig   OR  #ip a >> تتاكد من اللي عملته
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question2: Configure Repo
+
+Solution:
+
+# vim /etc/yum.repos.d/myrepo.repo
+  [AppStream]
+    name=AppStream
+    baseurl= http://.................
+    enabled=1
+    gpgcheck=0
+
+  [BaseOS]
+    name=BaseOS
+    baseurl=http://...........
+    enabled=1
+    gpgcheck=0
+   :wq
+# yum list         OR                # yum repolist 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question3:Debug Selinux
+
+Solution:
+
+# yum install http*
+# firewall-cmd --add-port=82/tcp --permanent
+# firewall-cmd --add-service=http --permanent
+# firewall-cmd --reload 
+# vim /etc/selinux/config 
+   SELINUX=enforcing
+    :wq
+# vim /etc/httpd/conf/httpd.conf
+     Listen  82
+     :wq
+# systemctl enable  httpd.service 
+# systemctl start httpd.service 
+# semanage port -l | grep http
+# semanage port -a -t http_port_t -p tcp 82
+# systemctl restart httpd.service 
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Question4: Users and Groups
+
+Solution:
+
+# groupadd sysadms
+# useradd -G sysadms natasha
+# useradd -G sysadms harry
+# useradd -s /sbin/nologin sarah
+# passwd natasha 
+# passwd harry
+# passwd sarah
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Question5:Cron job
+
+Solution:
+
+# systemctl enable crond.service
+# systemctl start crond.service
+# crontab -eu natasha
+   */1     *       *       *       *       logger "EX200 in progress"
+       :wq
+# systemctl restart crond.service
+
+
+Question6:Collaborative Directory
+
+Solution
+
+#mkdir /home/sysadms
+#groupadd sysadms
+#chgrp sysadms /home/sysadms
+#chmod 2770 /home/sysadms
+#touch +s /home/sysadms/file1.txt
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question7:NTP
+
+Solution:
+
+# yum install chrony*
+# systemctl enable chronyd.service
+# systemctl start chronyd.service
+# timedatectl set-ntp true
+# timedatectl
+# vim /etc/chrony.conf   >>>  هتلاقي سيرفير غير اللي هتعمله موجود شيله او حطله هاش كومنت
+   server classroom.example.com iburst
+   :wq
+# systemctl restart chronyd.service
+# chronyc sources -v
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question8:Autofs
+
+Solution:
+
+# yum install autofs*
+# systemctl enable autofs.service
+# systemctl start autofs.service
+# mkdir /home/guests
+# chmod 777 /home/guests
+#vim /etc/auto.master
+  /home/guests        /etc/auto.misc
+ :wq
+#vim /etc/auto.misc
+  remoteuser2  -rw,-fstype=nfs    calssroom.example.com:/home/guests/remoteuser2
+ :wq
+# systemctl restart autofs.service
+# reboot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question9:ACL
+
+Solution:
+
+
+# cp /etc/fastab /var/tmp/fstab
+# setfacl -m u:sarah:rw- /var/tmp/fstab
+# setfacl -m u:harry:--- /var/tmp/fstab
+# getfacl /var/tmp/fstab
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question10: Create user bob
+
+Solution:
+
+# useradd -u 2112 bob
+# passwd bob
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question11:Locates all files
+
+Solution:
+
+# mkdir /root/harry-files
+# find / -user harry -exec cp -rvfp {} /root/harry-files \;
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~`
+
+Question 12 : find string ich
+
+Solution:
+
+# grep "ich" /usr/lib/mem/ex200/samplefile.txt > /root/lines
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question 13: Create Archive
+
+Solution:
+
+# tar cvjf /root/backup.tar.bz2 /usr/local
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question 14 : Reset root password
+
+Solution:
+
+ Click on Power >> choose reset
+ press "e"  from keyboard >> edit
+ in end line (linux) write >> rd.break
+ ctrl -x
+ # mount -o remount,rw /sysroot/
+ # chroot /sysroot/
+ # passwd
+ # touch .autorelabel >> hidden file
+ # exit
+ # exit
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question 15 : repo
+
+Solution:
+
+# vim /etc/yum.repos.d/myrepo.repo
+  [AppStream]
+    name=AppStream
+    baseurl= http://.................
+    enabled=1
+    gpgcheck=0
+
+  [BaseOS]
+    name=BaseOS
+    baseurl=http://...........
+    enabled=1
+    gpgcheck=0
+   :wq
+# yum list         OR                # yum repolist 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question 16 : Resize  mylv between 200-300
+
+Solution:
+
+lsblk 
+ nvme0n2
+             nvme0n2p1  myvg-mylv    size=192M 
+          كده انا هعمل extend
+# lvextend -r -L 250M /dev/myvg/mylv
+# resize2fs   /dev/myvg/mylv
+# lsblk 
+    nvme0n2
+             nvme0n2p1  myvg-mylv    size=252M
+# reboot 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+Question 17 : SWAP 
+ 
+Solution:
+
+# fdisk /dev/nvme0n2
+    n > enter > enter > enter > partation 2 >>last sectors : +512M > t > partation 2 >> hex code : 82 >> w
+# mkswap /dev/nvme0n2p2
+# swapon  /dev/nvme0n2p2
+# vim /etc/fstab
+  /dev/nvme0n2p2       swap            swap      defaults    0      0
+ :wq
+# mount -a
+# reboot
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Question 18 : PE   50 * 8 = 400M
+
+Solution:
+
+# fdisk /dev/nvme0n2
+  
+  n > enter > enter > enter > partation 3 >>last sectors : +1024M > t > partation 3>> hex code : 8e  >> w
+# pvcreate /dev/nvme0n2p3
+# vgcreate -s 8M wgroup /dev/nvme0n2p3		>>Means that each PE size in the VG is 8M
+# lvcreate -l 50 -n wshare wgroup		>>Means create LV of 50 PE which means that the space is 50PE*8M=400M
+# mkfs.vfat /dev/mapper/wgroup-wshare
+# mkdir /mnt/wshare
+# vim /etc/fstab
+ /dev/mapper/wgroup-wshare	/mnt/wshare	vfat	defaults	0 	0
+  :wq
+# mount -a
+# reboot
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Qusetion 19 : VDO
+
+# yum install vdo kmod-kvdo
+# systemctl enable vdo.service
+# systemctl start vdo.service
+# vdo create --name labvdo  --device /dev/nvme0n3   --vdoLogicalSize 50G --verbose
+# mkfs.xfs -k /dev/mapper/labvdo  
+# mkdir /labvdovol
+# vim /etc/fstab
+   /dev/mapper/labvdo	/labvdovol	xfs	defaults,x-systemd.requires=vdo.service		0	0
+  :wq
+# systemctl restart vdo.service
+# mount -a
+# lsblk
+# reboot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Question 20 : System Tunning 
+
+Solution:
+
+# yum install tuned*
+# systemctl enable tuned.service
+# systemctl start tuned.service
+# tuned-adm active 
+Current active profile: virtual-guest
+# tuned-adm recommend 
+virtual-guest
+# tuned-adm profile virtual-guest
+# tuned-adm active 
+Current active profile: virtual-guest  
+             
+
